@@ -70,7 +70,14 @@ ax.scatter(np.diag(vcov**0.5), ret_mean_an, c='black',marker='*')
 ax.plot([0,port_std[s_p_m_ind]], [risk_free['TB3MS'][0],port_ret[s_p_m_ind]],c='r')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 plt.xlim(left=0)
-plt.title("The envelope. Number of assets:" + str(len(data.columns)))
+for label, x, y in zip(tickers,np.diag(vcov**0.5),ret_mean_an):
+    plt.annotate(
+        label,
+        xy=(x, y), xytext=(-20, 20),
+        textcoords='offset points', ha='right', va='bottom',
+        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+plt.title("The envelope. Number of assets:" + str(len(tickers)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()
@@ -158,6 +165,13 @@ ax.scatter(port_std_new[s_p_m_ind_new], port_ret_new[s_p_m_ind_new], c='red',mar
 ax.scatter(port_std_new[min_var_ind_new], port_ret_new[min_var_ind_new], c='red',marker='*')
 ax.plot([0,port_std_new[s_p_m_ind_new]], [risk_free['TB3MS'][0],port_ret_new[s_p_m_ind_new]],c='r')
 ax.scatter(np.diag(vcov_new**0.5), ret_mean_an_new, c='black',marker='*')
+for label, x, y in zip(ext_tickers,np.diag(vcov_new**0.5),ret_mean_an_new):
+    plt.annotate(
+        label,
+        xy=(x, y), xytext=(-20, 20),
+        textcoords='offset points', ha='right', va='bottom',
+        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
 ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3], [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='g',linestyle='--')
 plt.xlim(left=0,right=2)

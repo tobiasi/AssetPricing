@@ -63,13 +63,14 @@ min_var_ind = np.argmin(port_std)
 
 
 fig, ax = plt.subplots()
-ax.scatter(port_std, port_ret, c='blue')
+ax.scatter(port_std, port_ret, c='lightblue')
 ax.scatter(port_std[s_p_m_ind], port_ret[s_p_m_ind], c='red',marker='D')
 ax.scatter(port_std[min_var_ind], port_ret[min_var_ind], c='red',marker='*')
+ax.scatter(np.diag(vcov**0.5), ret_mean_an, c='black',marker='*')
 ax.plot([0,port_std[s_p_m_ind]], [risk_free['TB3MS'][0],port_ret[s_p_m_ind]],c='r')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 plt.xlim(left=0)
-plt.title("The envelope")
+plt.title("The envelope. Number of assets:" + str(len(data.columns)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()
@@ -77,7 +78,7 @@ plt.show()
 
 
 
-### What if we add more assets? (Seidel) ###
+### What if we add more assets? ###
 def get_sp500_tickers():
     resp    = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup    = bs.BeautifulSoup(resp.text, 'lxml')
@@ -93,7 +94,7 @@ def get_sp500_tickers():
 sp_tickers = get_sp500_tickers() 
 
 ## Fetch 20 random tickers ##
-magic_indicies = np.random.randint(1,500,10)
+magic_indicies = np.random.randint(1,500,20)
 ext_tickers    = tickers
 for ind in magic_indicies: 
     ext_tickers = np.append(ext_tickers,sp_tickers[ind])
@@ -126,7 +127,7 @@ print('.'*100)
 
 port_std_new = []
 port_ret_new = []
-simLen   = 10000
+simLen   = 30000
 print('\nProgress:')
 print('.'*100 + '\n')
 for ii in range(1,simLen+1):
@@ -152,14 +153,15 @@ min_var_ind_new = np.argmin(port_std_new)
 
 
 fig, ax = plt.subplots()
-ax.scatter(port_std_new, port_ret_new, c='blue')
+ax.scatter(port_std_new, port_ret_new, c='lightblue')
 ax.scatter(port_std_new[s_p_m_ind_new], port_ret_new[s_p_m_ind_new], c='red',marker='D')
 ax.scatter(port_std_new[min_var_ind_new], port_ret_new[min_var_ind_new], c='red',marker='*')
 ax.plot([0,port_std_new[s_p_m_ind_new]], [risk_free['TB3MS'][0],port_ret_new[s_p_m_ind_new]],c='r')
+ax.scatter(np.diag(vcov_new**0.5), ret_mean_an_new, c='black',marker='*')
 ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3], [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='g',linestyle='--')
 plt.xlim(left=0,right=2)
-plt.title("The envelope")
+plt.title("The envelope. Number of assets:" + str(len(data_new.columns)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()

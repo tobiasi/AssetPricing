@@ -61,41 +61,13 @@ s_p         = (port_ret-risk_free['TB3MS'][0])/port_std
 s_p_m_ind   = np.argmax(s_p)
 min_var_ind = np.argmin(port_std)
 
-
-
-fig, ax = plt.subplots()
-ax.scatter(port_std, port_ret, c='lightblue')
-ax.scatter(port_std[s_p_m_ind], port_ret[s_p_m_ind], c='red',marker='D')
-ax.scatter(port_std[min_var_ind], port_ret[min_var_ind], c='red',marker='*')
-ax.scatter(np.diag(vcov**0.5), ret_mean_an, c='black',marker='*')
-ax.plot([0,port_std[s_p_m_ind]], [risk_free['TB3MS'][0],port_ret[s_p_m_ind]],c='r')
-ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\
-         (port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
-plt.xlim(left=0)
-for label, x, y in zip(tickers,np.diag(vcov**0.5),ret_mean_an):
-    plt.annotate(
-        label,
-        xy=(x, y), xytext=(-20, 20),
-        textcoords='offset points', ha='right', va='bottom',
-        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
-plt.title("The envelope. Number of assets: " + str(len(tickers)))
-plt.xlabel(r'$\sigma$')
-plt.ylabel(r'$R_p$')
-plt.show()
-
-
-
-
-
-
 ### Identify GMVP by constrained optimization ###
 rf = risk_free.values[0].tolist()
 rf = rf[0]
 def objective_gmvp(w,ret,vcov,rf):
     temp = w*vcov*np.transpose(w)
     std  = sum(temp.sum())**0.5
-    s_p  = (sum(weights*ret_mean_an)-rf)/(std)
+    s_p  = (sum(w*ret_mean_an)-rf)/std
     return -1*s_p
 
 
@@ -108,15 +80,21 @@ x0  /= x0.sum()
 
 # Run optimization routine
 b    = (-3,3)
-bnds = (b,b,b,b)
+bnds = (b,)*len(weights)
 con  = {'type': 'eq', 'fun': constraint} 
-gmpv = minimize(objective_gmvp,x0,args=(ret_mean_an,vcov,rf),constraints=con,\
-                    bounds=bnds,options={'disp': True})
-x = gmpv.x
+gmvp = minimize(objective_gmvp,x0,args=(ret_mean_an,vcov,rf),constraints=con,
+                bounds=bnds,options={'disp': True})
+temp     = gmvp.x*vcov*np.transpose(gmvp.x)
+ret_gmvp = sum(gmvp.x*ret_mean_an)
+std_gmvp = sum(temp.sum())**0.5
+s_p_gmvp = (ret_gmvp-rf)/std_gmvp
+print('.'*100)
+print('\nGlobal Mean Variance portfolio:\n')
+print('Return = ' + str(ret_gmvp) + '\n')
+print('Standard deviation = ' +  str(std_gmvp) + '\n')
+print('Sharpe ratio = ' + str(s_p_gmvp) + '\n')
+print('.'*100)
 
-temp  = x*vcov*np.transpose(x)
-var_p = sum(temp.sum())**0.5
-s_p   = (sum(weights*ret_mean_an)-rf)/(var_p**0.5)
 
 ### Identify the minimum variance portfolio by constrained optimization ###
 def objective_var(w,vcov):
@@ -124,11 +102,49 @@ def objective_var(w,vcov):
     var_p = sum(temp.sum())
     return var_p
 
-minvar = minimize(objective_var,x0,args=(vcov),constraints=con,\
-                     options={'disp': True})
+minvar = minimize(objective_var,x0,args=(vcov),constraints=con,
+                  options={'disp': True})
+ret_minvar = sum(minvar.x*ret_mean_an)
+std_minvar = minvar.fun**0.5
+print('.'*100)
 print('\nMinimum variance portfolio:\n')
-print('Return = ' + str(sum(minvar.x*ret)) + '\n')
-print('Standard deviation = ' + str(minvar.fun**0.5) + '\n')
+print('Return = ' + str(ret_minvar) + '\n')
+print('Standard deviation = ' + str(std_minvar) + '\n')
+print('.'*100)
+
+fig, ax = plt.subplots()
+ax.scatter(port_std, port_ret, c='lightblue')
+ax.scatter(port_std[s_p_m_ind], port_ret[s_p_m_ind], c='red',marker='D')
+ax.scatter(port_std[min_var_ind], port_ret[min_var_ind], c='red',marker='*')
+ax.scatter(std_gmvp, ret_gmvp, c='orange',marker='D')
+ax.scatter(std_minvar, ret_minvar, c='orange',marker='*')
+ax.scatter(np.diag(vcov**0.5), ret_mean_an, c='black',marker='*')
+ax.plot([0,port_std[s_p_m_ind]], [risk_free['TB3MS'][0],port_ret[s_p_m_ind]],c='r')
+ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\
+         (port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
+plt.xlim(left=0)
+ii=1
+for port, x, y in zip(['GMVP, scipy','GMVP, sim','Min. Var. Port, scipy','Min. Var. Port, sim'],
+                      [std_gmvp,port_std[s_p_m_ind],std_minvar,port_std[min_var_ind]],
+                      [ret_gmvp,port_ret[s_p_m_ind],ret_minvar, port_ret[min_var_ind]]):
+    plt.annotate(
+        port, xy=(x, y), xytext=(-40*((-1)**(ii)), 80*((-1)**(ii))),
+        textcoords='offset points', ha='left', va='bottom',
+        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
+    ii = ii+1
+
+#for ticker, x, y in zip(tickers,np.diag(vcov**0.5),ret_mean_an):
+#    plt.annotate(
+#        ticker,
+#        xy=(x, y), xytext=(-20, 20),
+#        textcoords='offset points', ha='right', va='bottom',
+#        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+#        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
+plt.title("The envelope. Number of assets: " + str(len(tickers)))
+plt.xlabel(r'$\sigma$')
+plt.ylabel(r'$R_p$')
+plt.show()
 
 
 ### What if we add more assets? ###

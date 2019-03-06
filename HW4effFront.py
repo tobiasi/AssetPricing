@@ -161,6 +161,7 @@ plt.title("The envelope. Number of assets: " + str(len(tickers)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()
+plt.savefig('plot1.pdf')
 
 
 ### What if we add more assets? ###
@@ -199,7 +200,7 @@ print('.'*100)
 
 port_std_new = []
 port_ret_new = []
-simLen   = 10000
+simLen   = 50000
 print('\nProgress:')
 print('.'*100 + '\n')
 for ii in range(1,simLen+1):
@@ -267,7 +268,7 @@ plt.title("The envelope. Number of assets: " + str(len(data_new.columns)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()
-
+plt.savefig('plot2.pdf')
 
 
 ### Figure with both envelopes, for comparison
@@ -280,6 +281,7 @@ plt.title('The envelope.')
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()
+plt.savefig('comparison.pdf')
 
 
 

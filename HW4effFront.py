@@ -16,6 +16,44 @@ import bs4 as bs
 import sys
 from scipy.optimize import minimize
 
+### Define functions ###
+# Objective function for global mean variance portfolio
+# - w    : vector of weights
+# - ret  : vector of returns
+# - vCov : covariance matrix 
+# - rf   : risk-free rate
+def objective_gmvp(w,ret,vCov,rf):
+    var = np.matmul(np.matmul(w,vCov),np.transpose(w))
+    std  = var**0.5
+    s_p  = (np.matmul(w,ret)-rf)/std
+    return -1*s_p
+
+# Objective function for minimum variance portfolio.
+# - w   : vector of weights
+# - ret : vector of returns
+def objective_var(w,vCov):
+    var_p = np.matmul(np.matmul(w,vCov),np.transpose(w))
+    return var_p
+
+# Constraint. We want our weights to sum to one.
+# - w   : vector of weights
+def constraint(w):
+    return sum(w) - 1
+
+# Scraping function to get tickers from members of the S&P 500 index.
+def get_sp500_tickers():
+    resp    = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    soup    = bs.BeautifulSoup(resp.text, 'lxml')
+    table   = soup.find('table', {'class': 'wikitable sortable'})
+    tickers = []
+    for row in table.findAll('tr')[1:]:
+        ticker = row.findAll('td')[1].text
+        tickers.append(ticker)
+    with open("sp500tickers.pickle", "wb") as f:
+        pickle.dump(tickers, f)
+    return tickers
+
+###############################################################################
 
 tickers    = ['AAPL','MSFT','GOOGL','GLD']
 data       = pd.DataFrame()
@@ -53,7 +91,7 @@ for ii in range(1,simLen+1):
     if (ii % 100==0 and ii != simLen+1):
         b=('Finished with iteration ' + str(ii) + ' of ' + str(len(range(1,simLen+1))))
         sys.stdout.write('\r'+b) 
-    if (ii == simLen): sys.stdout.write('\r'+'Done!') 
+    if (ii == simLen): sys.stdout.write('\r'+'-'*30+' Done! '+'-'*30+'\n') 
 
 ## Identify mean-variance portfolio through simulation ##
 risk_free   = web.get_data_fred('TB3MS',start=end,end=end)/100
@@ -64,21 +102,12 @@ min_var_ind = np.argmin(port_std)
 ### Identify GMVP by constrained optimization ###
 rf = risk_free.values[0].tolist()
 rf = rf[0]
-def objective_gmvp(w,ret,vCov,rf):
-    var = np.matmul(np.matmul(w,vCov),np.transpose(w))
-    std  = var**0.5
-    s_p  = (np.matmul(w,ret)-rf)/std
-    return -1*s_p
-
-
-def constraint(w):
-    return sum(w) - 1
 
 # Initial guesses
 x0   = np.ones(len(weights))
 x0  /= x0.sum()
 
-# Run optimization routine
+# Run optimization routine, find GMVP
 b    = (-3,3)
 bnds = (b,)*len(weights)
 con  = {'type': 'eq', 'fun': constraint} 
@@ -96,11 +125,7 @@ print('Sharpe ratio = ' + str(s_p_gmvp) + '\n')
 print('.'*100)
 
 
-### Identify the minimum variance portfolio by constrained optimization ###
-def objective_var(w,vCov):
-    var_p = np.matmul(np.matmul(w,vCov),np.transpose(w))
-    return var_p
-
+# Run optimization routine, find MVP
 minvar = minimize(objective_var,x0,args=(vcov),constraints=con,
                   options={'disp': True})
 ret_minvar = np.matmul(minvar.x,ret_mean_an)
@@ -132,14 +157,6 @@ for port, x, y in zip(['GMVP, scipy','GMVP, sim','Min. Var. Port, scipy','Min. V
         bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
         arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
     ii = ii+1
-
-#for ticker, x, y in zip(tickers,np.diag(vcov**0.5),ret_mean_an):
-#    plt.annotate(
-#        ticker,
-#        xy=(x, y), xytext=(-20, 20),
-#        textcoords='offset points', ha='right', va='bottom',
-#        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-#        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=0'))
 plt.title("The envelope. Number of assets: " + str(len(tickers)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
@@ -147,17 +164,6 @@ plt.show()
 
 
 ### What if we add more assets? ###
-def get_sp500_tickers():
-    resp    = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
-    soup    = bs.BeautifulSoup(resp.text, 'lxml')
-    table   = soup.find('table', {'class': 'wikitable sortable'})
-    tickers = []
-    for row in table.findAll('tr')[1:]:
-        ticker = row.findAll('td')[1].text
-        tickers.append(ticker)
-    with open("sp500tickers.pickle", "wb") as f:
-        pickle.dump(tickers, f)
-    return tickers
 
 sp_tickers = get_sp500_tickers() 
 
@@ -206,7 +212,7 @@ for ii in range(1,simLen+1):
     if (ii % 100==0 and ii != simLen):
         b=('Finished with iteration ' + str(ii) + ' of ' + str(len(range(1,simLen+1))))
         sys.stdout.write('\r'+b) 
-    if (ii == simLen): sys.stdout.write('\r'+'Done!') 
+    if (ii == simLen): sys.stdout.write('\r'+'-'*30+' Done! '+'-'*30+'\n') 
     
 ## Identify mean-variance portfolio through simulation ##
 risk_free       = web.get_data_fred('TB3MS',start=end,end=end)/100
@@ -227,7 +233,7 @@ gmvp_new = minimize(objective_gmvp,x0,args=(ret_mean_an_new,vcov_new,rf),constra
 ret_gmvp_new = np.matmul(gmvp_new.x,ret_mean_an_new)
 std_gmvp_new = objective_var(gmvp_new.x,vcov_new)**0.5
 
-# Run optimization routine, find GMVP
+# Run optimization routine, find MVP
 minvar_new = minimize(objective_var,x0,args=(vcov_new),constraints=con,
                       options={'disp': True})
 ret_minvar_new = np.matmul(minvar_new.x,ret_mean_an_new)
@@ -252,15 +258,6 @@ for port, x, y in zip(['GMVP, scipy','GMVP, sim','Min. Var. Port, scipy','Min. V
         bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
         arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
     ii = ii+1
-#ii=1
-#for label, x, y in zip(ext_tickers,np.diag(vcov_new**0.5),ret_mean_an_new):
-#    plt.annotate(
-#        label,
-#        xy=(x, y), xytext=(-40*((-1)**(ii)), 80*((-1)**(ii))),
-#        textcoords='offset points', ha='left', va='bottom',
-#        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
-#        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
-#    ii = ii+1
 ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3],\
         [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\

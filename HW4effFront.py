@@ -64,10 +64,10 @@ min_var_ind = np.argmin(port_std)
 ### Identify GMVP by constrained optimization ###
 rf = risk_free.values[0].tolist()
 rf = rf[0]
-def objective_gmvp(w,ret,vcov,rf):
-    temp = w*vcov*np.transpose(w)
+def objective_gmvp(w,ret,vCov,rf):
+    temp = w*vCov*np.transpose(w)
     std  = sum(temp.sum())**0.5
-    s_p  = (sum(w*ret_mean_an)-rf)/std
+    s_p  = (sum(w*ret)-rf)/std
     return -1*s_p
 
 
@@ -217,6 +217,17 @@ s_p_new         = (port_ret_new-risk_free['TB3MS'][0])/port_std_new
 s_p_m_ind_new   = np.argmax(s_p_new)
 min_var_ind_new = np.argmin(port_std_new)
 
+
+# Initial guesses
+x0   = np.ones(len(data_new.columns))
+x0  /= x0.sum()
+
+# Run optimization routine
+b        = (-3,3)
+bnds     = (b,)*len(data_new.columns)
+con      = {'type': 'eq', 'fun': constraint} 
+gmvp_new = minimize(objective_gmvp,x0,args=(ret_mean_an_new,vcov_new,rf),constraints=con,
+                    bounds=bnds,options={'disp': True})
 
 
 

@@ -14,6 +14,7 @@ import pickle
 import requests
 import bs4 as bs
 import sys
+from scipy.optimize import minimize
 
 
 tickers    = ['AAPL','MSFT','GOOGL','GLD']
@@ -68,7 +69,8 @@ ax.scatter(port_std[s_p_m_ind], port_ret[s_p_m_ind], c='red',marker='D')
 ax.scatter(port_std[min_var_ind], port_ret[min_var_ind], c='red',marker='*')
 ax.scatter(np.diag(vcov**0.5), ret_mean_an, c='black',marker='*')
 ax.plot([0,port_std[s_p_m_ind]], [risk_free['TB3MS'][0],port_ret[s_p_m_ind]],c='r')
-ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
+ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\
+         (port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 plt.xlim(left=0)
 for label, x, y in zip(tickers,np.diag(vcov**0.5),ret_mean_an):
     plt.annotate(
@@ -83,6 +85,50 @@ plt.ylabel(r'$R_p$')
 plt.show()
 
 
+
+
+
+
+### Identify GMVP by constrained optimization ###
+rf = risk_free.values[0].tolist()
+rf = rf[0]
+def objective_gmvp(w,ret,vcov,rf):
+    temp = w*vcov*np.transpose(w)
+    std  = sum(temp.sum())**0.5
+    s_p  = (sum(weights*ret_mean_an)-rf)/(std)
+    return -1*s_p
+
+
+def constraint(w):
+    return sum(w) - 1
+
+# Initial guesses
+x0   = np.ones(len(weights))
+x0  /= x0.sum()
+
+# Run optimization routine
+b    = (-3,3)
+bnds = (b,b,b,b)
+con  = {'type': 'eq', 'fun': constraint} 
+gmpv = minimize(objective_gmvp,x0,args=(ret_mean_an,vcov,rf),constraints=con,\
+                    bounds=bnds,options={'disp': True})
+x = gmpv.x
+
+temp  = x*vcov*np.transpose(x)
+var_p = sum(temp.sum())**0.5
+s_p   = (sum(weights*ret_mean_an)-rf)/(var_p**0.5)
+
+### Identify the minimum variance portfolio by constrained optimization ###
+def objective_var(w,vcov):
+    temp  = w*vcov*np.transpose(w)
+    var_p = sum(temp.sum())
+    return var_p
+
+minvar = minimize(objective_var,x0,args=(vcov),constraints=con,\
+                     options={'disp': True})
+print('\nMinimum variance portfolio:\n')
+print('Return = ' + str(sum(minvar.x*ret)) + '\n')
+print('Standard deviation = ' + str(minvar.fun**0.5) + '\n')
 
 
 ### What if we add more assets? ###
@@ -134,7 +180,7 @@ print('.'*100)
 
 port_std_new = []
 port_ret_new = []
-simLen   = 30000
+simLen   = 100000
 print('\nProgress:')
 print('.'*100 + '\n')
 for ii in range(1,simLen+1):
@@ -174,10 +220,12 @@ for label, x, y in zip(ext_tickers,np.diag(vcov_new**0.5),ret_mean_an_new):
         bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
         arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
     ii = ii+1
-ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3], [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
-ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],(port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='g',linestyle='--')
+ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3],\
+        [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
+ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\
+         (port_ret[s_p_m_ind]-risk_free['TB3MS'][0])*3],c='g',linestyle='--')
 plt.xlim(left=0,right=2)
-plt.title("The envelope. Number of assets:" + str(len(data_new.columns)))
+plt.title("The envelope. Number of assets: " + str(len(data_new.columns)))
 plt.xlabel(r'$\sigma$')
 plt.ylabel(r'$R_p$')
 plt.show()

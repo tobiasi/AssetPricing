@@ -2,7 +2,7 @@
 """
 Created on Sat Mar  2 08:34:05 2019
 
-@author:  ~ 
+Asset Pricing Theory, Spring 2019
 """
 
 import pandas as pd
@@ -47,9 +47,9 @@ for ii in range(1,simLen+1):
     weights   = np.random.normal(0,1,len(tickers))
     weights  /= weights.sum()
     if np.any(weights>=2) or np.any(weights<=-2): continue
-    temp      = weights*vcov*np.transpose(weights)
-    port_std  = np.append(port_std,sum(temp.sum())**0.5)
-    port_ret  = np.append(port_ret,sum(weights*ret_mean_an))
+    port_var  = np.matmul(np.matmul(weights,vcov),np.transpose(weights))
+    port_std  = np.append(port_std,port_var**0.5)
+    port_ret  = np.append(port_ret,np.matmul(weights,ret_mean_an))
     if (ii % 100==0 and ii != simLen+1):
         b=('Finished with iteration ' + str(ii) + ' of ' + str(len(range(1,simLen+1))))
         sys.stdout.write('\r'+b) 
@@ -65,9 +65,9 @@ min_var_ind = np.argmin(port_std)
 rf = risk_free.values[0].tolist()
 rf = rf[0]
 def objective_gmvp(w,ret,vCov,rf):
-    temp = w*vCov*np.transpose(w)
-    std  = sum(temp.sum())**0.5
-    s_p  = (sum(w*ret)-rf)/std
+    var = np.matmul(np.matmul(w,vCov),np.transpose(w))
+    std  = var**0.5
+    s_p  = (np.matmul(w,ret)-rf)/std
     return -1*s_p
 
 
@@ -84,9 +84,9 @@ bnds = (b,)*len(weights)
 con  = {'type': 'eq', 'fun': constraint} 
 gmvp = minimize(objective_gmvp,x0,args=(ret_mean_an,vcov,rf),constraints=con,
                 bounds=bnds,options={'disp': True})
-temp     = gmvp.x*vcov*np.transpose(gmvp.x)
-ret_gmvp = sum(gmvp.x*ret_mean_an)
-std_gmvp = sum(temp.sum())**0.5
+var_gmvp = np.matmul(np.matmul(gmvp.x,vcov),np.transpose(gmvp.x))
+ret_gmvp = np.matmul(gmvp.x,ret_mean_an)
+std_gmvp = var_gmvp**0.5
 s_p_gmvp = (ret_gmvp-rf)/std_gmvp
 print('.'*100)
 print('\nGlobal Mean Variance portfolio:\n')
@@ -97,14 +97,13 @@ print('.'*100)
 
 
 ### Identify the minimum variance portfolio by constrained optimization ###
-def objective_var(w,vcov):
-    temp  = w*vcov*np.transpose(w)
-    var_p = sum(temp.sum())
+def objective_var(w,vCov):
+    var_p = np.matmul(np.matmul(w,vCov),np.transpose(w))
     return var_p
 
 minvar = minimize(objective_var,x0,args=(vcov),constraints=con,
                   options={'disp': True})
-ret_minvar = sum(minvar.x*ret_mean_an)
+ret_minvar = np.matmul(minvar.x,ret_mean_an)
 std_minvar = minvar.fun**0.5
 print('.'*100)
 print('\nMinimum variance portfolio:\n')
@@ -168,8 +167,6 @@ ext_tickers    = tickers
 for ind in magic_indicies: 
     ext_tickers = np.append(ext_tickers,sp_tickers[ind])
 
-
-
 start     = dt.datetime(2005, 1, 1)
 end       = dt.datetime(2018,1,1)
 data_new  = pd.DataFrame()
@@ -196,16 +193,16 @@ print('.'*100)
 
 port_std_new = []
 port_ret_new = []
-simLen   = 100000
+simLen   = 10000
 print('\nProgress:')
 print('.'*100 + '\n')
 for ii in range(1,simLen+1):
     weights   = np.random.normal(0,1,len(data_new.columns))
     weights  /= weights.sum()
     if np.any(weights>=2) or np.any(weights<=-2): continue
-    temp          = weights*vcov_new*np.transpose(weights)
-    port_std_new  = np.append(port_std_new,sum(temp.sum())**0.5)
-    port_ret_new  = np.append(port_ret_new,sum(weights*ret_mean_an_new))
+    port_var_new = np.matmul(np.matmul(weights,vcov_new),np.transpose(weights))
+    port_std_new = np.append(port_std_new,port_var_new**0.5)
+    port_ret_new = np.append(port_ret_new,np.matmul(weights,ret_mean_an_new))
     if (ii % 100==0 and ii != simLen):
         b=('Finished with iteration ' + str(ii) + ' of ' + str(len(range(1,simLen+1))))
         sys.stdout.write('\r'+b) 
@@ -217,36 +214,53 @@ s_p_new         = (port_ret_new-risk_free['TB3MS'][0])/port_std_new
 s_p_m_ind_new   = np.argmax(s_p_new)
 min_var_ind_new = np.argmin(port_std_new)
 
-
 # Initial guesses
 x0   = np.ones(len(data_new.columns))
 x0  /= x0.sum()
 
-# Run optimization routine
+# Run optimization routine, find GMVP
 b        = (-3,3)
 bnds     = (b,)*len(data_new.columns)
 con      = {'type': 'eq', 'fun': constraint} 
 gmvp_new = minimize(objective_gmvp,x0,args=(ret_mean_an_new,vcov_new,rf),constraints=con,
                     bounds=bnds,options={'disp': True})
+ret_gmvp_new = np.matmul(gmvp_new.x,ret_mean_an_new)
+std_gmvp_new = objective_var(gmvp_new.x,vcov_new)**0.5
 
-
+# Run optimization routine, find GMVP
+minvar_new = minimize(objective_var,x0,args=(vcov_new),constraints=con,
+                      options={'disp': True})
+ret_minvar_new = np.matmul(minvar_new.x,ret_mean_an_new)
+std_minvar_new = minvar_new.fun**0.5
 
 
 fig, ax = plt.subplots()
 ax.scatter(port_std_new, port_ret_new, c='lightblue')
 ax.scatter(port_std_new[s_p_m_ind_new], port_ret_new[s_p_m_ind_new], c='red',marker='D')
 ax.scatter(port_std_new[min_var_ind_new], port_ret_new[min_var_ind_new], c='red',marker='*')
+ax.scatter(std_gmvp_new, ret_gmvp_new, c='orange',marker='D')
+ax.scatter(std_minvar_new, ret_minvar_new, c='orange',marker='*')
 ax.plot([0,port_std_new[s_p_m_ind_new]], [risk_free['TB3MS'][0],port_ret_new[s_p_m_ind_new]],c='r')
 ax.scatter(np.diag(vcov_new**0.5), ret_mean_an_new, c='black',marker='*')
 ii=1
-for label, x, y in zip(ext_tickers,np.diag(vcov_new**0.5),ret_mean_an_new):
+for port, x, y in zip(['GMVP, scipy','GMVP, sim','Min. Var. Port, scipy','Min. Var. Port, sim'],
+                      [std_gmvp_new,port_std_new[s_p_m_ind_new],std_minvar_new,port_std_new[min_var_ind_new]],
+                      [ret_gmvp_new,port_ret_new[s_p_m_ind_new],ret_minvar_new, port_ret_new[min_var_ind_new]]):
     plt.annotate(
-        label,
-        xy=(x, y), xytext=(-40*((-1)**(ii)), 80*((-1)**(ii))),
+        port, xy=(x, y), xytext=(-40*((-1)**(ii)), 80*((-1)**(ii))),
         textcoords='offset points', ha='left', va='bottom',
         bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
         arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
     ii = ii+1
+#ii=1
+#for label, x, y in zip(ext_tickers,np.diag(vcov_new**0.5),ret_mean_an_new):
+#    plt.annotate(
+#        label,
+#        xy=(x, y), xytext=(-40*((-1)**(ii)), 80*((-1)**(ii))),
+#        textcoords='offset points', ha='left', va='bottom',
+#        bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.5),
+#        arrowprops=dict(arrowstyle = '->', connectionstyle='arc3,rad=' + str((-1)**(ii)*0.5)))
+#    ii = ii+1
 ax.plot([port_std_new[s_p_m_ind_new],port_std_new[s_p_m_ind_new]*3],\
         [port_ret_new[s_p_m_ind_new],(port_ret_new[s_p_m_ind_new]-risk_free['TB3MS'][0])*3],c='r',linestyle='--')
 ax.plot([port_std[s_p_m_ind],port_std[s_p_m_ind]*3], [port_ret[s_p_m_ind],\
@@ -259,7 +273,16 @@ plt.show()
 
 
 
-
+### Figure with both envelopes, for comparison
+fig, ax = plt.subplots()
+ax.scatter(port_std, port_ret, c='red')
+ax.scatter(port_std_new, port_ret_new, c='lightblue' ,alpha=0.6)
+ax.legend(['Number of assets: '+ str(len(tickers)),'Number of assets: '+ str(len(data_new.columns))])
+plt.xlim(left=0,right=1)
+plt.title('The envelope.')
+plt.xlabel(r'$\sigma$')
+plt.ylabel(r'$R_p$')
+plt.show()
 
 
 

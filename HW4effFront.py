@@ -17,32 +17,58 @@ import sys
 from scipy.optimize import minimize
 
 ### Define functions ###
-# Objective function for global mean variance portfolio
-# - w    : vector of weights
-# - ret  : vector of returns
-# - vCov : covariance matrix 
-# - rf   : risk-free rate
 def objective_gmvp(w,ret,vCov,rf):
+    '''
+    Objective function for global mean variance portfolio
+    Inputs:
+     - w    : vector of weights
+     - ret  : vector of returns
+     - vCov : covariance matrix 
+     - rf   : risk-free rate
+    
+    Output:
+        - -1s_p : The Sharpe ratio times negative one.
+    '''
     var = np.matmul(np.matmul(w,vCov),np.transpose(w))
     std  = var**0.5
     s_p  = (np.matmul(w,ret)-rf)/std
     return -1*s_p
 
-# Objective function for minimum variance portfolio.
-# - w   : vector of weights
-# - ret : vector of returns
+
 def objective_var(w,vCov):
+    '''
+    Objective function for minimum variance portfolio.
+    Inputs:
+     - w   : vector of weights
+     - ret : vector of returns
+     
+    Output:
+    - var_p : The portfolio variance.     
+    '''
     var_p = np.matmul(np.matmul(w,vCov),np.transpose(w))
     return var_p
 
-# Constraint. We want our weights to sum to one.
-# - w   : vector of weights
 def constraint(w):
+    '''
+    Constraint. We want our weights to sum to one.
+    Input:
+     - w   : vector of weights
+    
+    Output:
+     - The sum of the weight vector minus one.   
+    '''
     return sum(w) - 1
 
-# Scraping function to get tickers from members of the S&P 500 index.
+
 def get_sp500_tickers():
-    resp    = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
+    '''
+    Scraping function to get tickers from members of the S&P 500 index. 
+    Inputs : NONE
+    Outputs: 
+     - tickers : The tickers of all members of the S&P 500 index
+    '''
+    resp    = requests.get('http://en.wikipedia.org/wiki/List_of_S%'+
+                           '26P_500_companies')
     soup    = bs.BeautifulSoup(resp.text, 'lxml')
     table   = soup.find('table', {'class': 'wikitable sortable'})
     tickers = []
